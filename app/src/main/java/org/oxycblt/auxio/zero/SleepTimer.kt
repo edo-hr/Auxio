@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
+ 
 package org.oxycblt.auxio.zero
 
 import android.os.Handler
@@ -67,5 +67,6 @@ class SleepTimer @Inject constructor(private val playbackManager: PlaybackStateM
         _endsAt.value = null
     }
 
-    fun remainingMs(): Long? = _endsAt.value?.let { (it - SystemClock.elapsedRealtime()).coerceAtLeast(0) }
+    fun remainingMs(): Long? =
+        _endsAt.value?.let { (it - SystemClock.elapsedRealtime()).coerceAtLeast(0) }
 }

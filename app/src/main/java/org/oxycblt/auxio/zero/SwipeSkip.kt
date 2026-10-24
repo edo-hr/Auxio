@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
+ 
 package org.oxycblt.auxio.zero
 
 import android.annotation.SuppressLint
@@ -26,8 +26,8 @@ import android.view.ViewGroup
 import kotlin.math.abs
 
 /**
- * Lets the user swipe horizontally on this view to skip tracks, Spotify-style. Swiping left goes
- * to the next track, right to the previous one. Taps and long presses keep working.
+ * Lets the user swipe horizontally on this view to skip tracks, Spotify-style. Swiping left goes to
+ * the next track, right to the previous one. Taps and long presses keep working.
  *
  * @param moving Views that follow the finger during the swipe.
  */

@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
+ 
 package org.oxycblt.auxio.zero
 
 import android.content.Context
@@ -68,7 +68,10 @@ class FolderFragment :
     override fun onCreateBinding(inflater: LayoutInflater) =
         ZeroFragmentFoldersBinding.inflate(inflater)
 
-    override fun onBindingCreated(binding: ZeroFragmentFoldersBinding, savedInstanceState: Bundle?) {
+    override fun onBindingCreated(
+        binding: ZeroFragmentFoldersBinding,
+        savedInstanceState: Bundle?,
+    ) {
         super.onBindingCreated(binding, savedInstanceState)
         binding.zeroFoldersToolbar.apply {
             inflateMenu(R.menu.zero_folders)
@@ -91,9 +94,7 @@ class FolderFragment :
 
     override fun onMusicChanges(changes: MusicRepository.Changes) {
         if (!changes.deviceLibrary) return
-        view?.post {
-            if (view != null) rebuild()
-        }
+        view?.post { if (view != null) rebuild() }
     }
 
     override fun onIndexMoved(index: Int) = refreshPlaying()
@@ -289,8 +290,7 @@ class FolderNode(val name: String, val parent: FolderNode?) {
             val volumeNames = HashMap<Any, String>()
             for (song in songs) {
                 val dir = song.path.directory
-                val volume =
-                    volumeNames.getOrPut(dir.volume) { dir.volume.resolveName(context) }
+                val volume = volumeNames.getOrPut(dir.volume) { dir.volume.resolveName(context) }
                 var node = root.children.getOrPut(volume) { FolderNode(volume, root) }
                 for (c in dir.components.components) {
                     val parent = node

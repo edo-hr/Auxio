@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
+ 
 package org.oxycblt.auxio.zero
 
 import android.content.Context
@@ -41,8 +41,7 @@ data class FolderSort(val mode: Mode, val descending: Boolean) {
         val primary: Comparator<Song> =
             when (mode) {
                 Mode.FILE_NAME -> byFile
-                Mode.TITLE ->
-                    compareBy(NaturalOrder) { s: Song -> s.name.resolve(context) }
+                Mode.TITLE -> compareBy(NaturalOrder) { s: Song -> s.name.resolve(context) }
                 Mode.ARTIST ->
                     compareBy(NaturalOrder) { s: Song -> s.artists.resolveNames(context) }
                 Mode.ALBUM -> compareBy(NaturalOrder) { s: Song -> s.album.name.resolve(context) }
@@ -55,7 +54,11 @@ data class FolderSort(val mode: Mode, val descending: Boolean) {
     }
 
     fun save(context: Context) {
-        prefs(context).edit().putString(KEY_MODE, mode.name).putBoolean(KEY_DESC, descending).apply()
+        prefs(context)
+            .edit()
+            .putString(KEY_MODE, mode.name)
+            .putBoolean(KEY_DESC, descending)
+            .apply()
     }
 
     companion object {

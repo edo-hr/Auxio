@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
+ 
 package org.oxycblt.auxio.zero
 
 import android.annotation.SuppressLint
@@ -35,9 +35,8 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** Circular dial selecting [MIN_MINUTES]..[MAX_MINUTES] in [STEP_MINUTES] steps. */
-class SleepDialView
-@JvmOverloads
-constructor(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
+class SleepDialView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
+    View(context, attrs) {
     private val density = resources.displayMetrics.density
     private val stroke = 10 * density
     private val thumbRadius = 14 * density
@@ -56,10 +55,7 @@ constructor(context: Context, attrs: AttributeSet? = null) : View(context, attrs
     private val arcPaint =
         Paint(trackPaint).apply {
             color =
-                MaterialColors.getColor(
-                    this@SleepDialView,
-                    androidx.appcompat.R.attr.colorPrimary,
-                )
+                MaterialColors.getColor(this@SleepDialView, androidx.appcompat.R.attr.colorPrimary)
         }
     private val thumbPaint = Paint(arcPaint).apply { style = Paint.Style.FILL }
     private val textPaint =
