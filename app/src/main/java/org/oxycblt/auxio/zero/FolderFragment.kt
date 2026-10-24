@@ -23,10 +23,12 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.Toolbar
 import androidx.core.os.bundleOf
+import androidx.core.view.isVisible
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.transition.MaterialSharedAxis
@@ -55,14 +57,19 @@ class FolderFragment :
     @Inject lateinit var musicRepository: MusicRepository
     @Inject lateinit var playbackManager: PlaybackStateManager
 
+    private val isTab: Boolean
+        get() = arguments?.getBoolean(KEY_TAB) == true
+
     private var top: FolderNode? = null
     private var current: FolderNode? = null
     private val adapter = FolderAdapter()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enterTransition = MaterialSharedAxis(MaterialSharedAxis.X, true)
-        returnTransition = MaterialSharedAxis(MaterialSharedAxis.X, false)
+        if (!isTab) {
+            enterTransition = MaterialSharedAxis(MaterialSharedAxis.X, true)
+            returnTransition = MaterialSharedAxis(MaterialSharedAxis.X, false)
+        }
     }
 
     override fun onCreateBinding(inflater: LayoutInflater) =
@@ -73,6 +80,7 @@ class FolderFragment :
         savedInstanceState: Bundle?,
     ) {
         super.onBindingCreated(binding, savedInstanceState)
+        binding.zeroFoldersAppbar.isVisible = !isTab
         binding.zeroFoldersToolbar.apply {
             inflateMenu(R.menu.zero_folders)
             setOnMenuItemClickListener(this@FolderFragment)
@@ -148,16 +156,17 @@ class FolderFragment :
         when (item.itemId) {
             R.id.zero_action_play -> play(node, null, false)
             R.id.zero_action_shuffle -> play(node, null, true)
-            R.id.zero_action_sort -> showSortMenu()
+            R.id.zero_action_sort ->
+                showSortMenu(
+                    requireBinding().zeroFoldersToolbar.let { it.getMenuButton(item.itemId) ?: it }
+                )
             else -> return false
         }
         return true
     }
 
-    private fun showSortMenu() {
+    fun showSortMenu(anchor: View) {
         val context = requireContext()
-        val toolbar = requireBinding().zeroFoldersToolbar
-        val anchor = toolbar.getMenuButton(R.id.zero_action_sort) ?: toolbar
         val sort = FolderSort.load(context)
         val popup = PopupMenu(context, anchor)
         FolderSort.Mode.entries.forEachIndexed { i, mode ->
@@ -239,7 +248,7 @@ class FolderFragment :
                     b.songAlbumCover.bind(song)
                     b.songName.text = song.name.resolve(context)
                     b.songInfo.text = song.artists.resolveNames(context)
-                    b.songMenu.visibility = android.view.View.GONE
+                    b.songMenu.visibility = View.GONE
                     val active = playbackManager.currentSong == song
                     b.root.isSelected = active
                     b.songAlbumCover.setPlaying(active && playbackManager.progression.isPlaying)
@@ -254,12 +263,16 @@ class FolderFragment :
 
     private class SongHolder(val binding: ItemSongBinding) : RecyclerView.ViewHolder(binding.root)
 
-    private companion object {
-        const val KEY_PATH = "path"
-        const val TYPE_FOLDER = 0
-        const val TYPE_SONG = 1
-        const val GROUP_MODES = 1
-        const val ID_DESCENDING = 1000
+    companion object {
+        private const val KEY_PATH = "path"
+        private const val KEY_TAB = "tab"
+
+        fun newTab() = FolderFragment().apply { arguments = bundleOf(KEY_TAB to true) }
+
+        private const val TYPE_FOLDER = 0
+        private const val TYPE_SONG = 1
+        private const val GROUP_MODES = 1
+        private const val ID_DESCENDING = 1000
     }
 }
 

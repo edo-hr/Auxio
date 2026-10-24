@@ -15,11 +15,6 @@
         app:showAsAction="ifRoom" />
 
     <item
-        android:id="@+id/action_zero_folders"
-        android:title="@string/zero_folders"
-        app:showAsAction="never" />
-
-    <item
         android:id="@+id/action_settings"
         android:title="@string/set_root_title"
         app:showAsAction="never" />

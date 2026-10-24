@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:visibility="invisible">
+
+    <org.oxycblt.auxio.image.CoverView
+        android:id="@+id/zero_ghost_cover"
+        style="@style/Widget.Auxio.Image.Small"
+        android:layout_marginStart="@dimen/spacing_small"
+        app:enablePlaybackIndicator="false"
+        app:enableSelectionBadge="false" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/spacing_small"
+        android:layout_marginEnd="@dimen/spacing_tiny"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/zero_ghost_song"
+            style="@style/Widget.Auxio.TextView.Primary.Compact"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:id="@+id/zero_ghost_info"
+            style="@style/Widget.Auxio.TextView.Secondary.Compact"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+</LinearLayout>

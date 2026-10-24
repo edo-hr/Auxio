@@ -65,6 +65,8 @@ import org.oxycblt.auxio.util.collectImmediately
 import org.oxycblt.auxio.util.dampen
 import org.oxycblt.auxio.util.navigateSafe
 import org.oxycblt.auxio.util.showToast
+import org.oxycblt.auxio.zero.FolderFragment
+import org.oxycblt.auxio.zero.ZeroTabStrategy
 import org.oxycblt.musikr.IndexingProgress
 import org.oxycblt.musikr.Music
 import org.oxycblt.musikr.Playlist
@@ -84,6 +86,7 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
     override val playbackModel: PlaybackViewModel by activityViewModels()
     private val homeModel: HomeViewModel by activityViewModels()
     private val detailModel: DetailViewModel by activityViewModels()
+    private var zeroFoldersSelected = false
     private var storagePermissionLauncher: ActivityResultLauncher<String>? = null
     private var getContentLauncher: ActivityResultLauncher<String>? = null
     private var pendingImportTarget: Playlist? = null
@@ -139,7 +142,13 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
             registerOnPageChangeCallback(
                 object : ViewPager2.OnPageChangeCallback() {
                     override fun onPageSelected(position: Int) {
+                        zeroFoldersSelected = position >= homeModel.currentTabTypes.size
+                        if (zeroFoldersSelected) {
+                            binding.homeAppbar.liftOnScrollTargetViewId = R.id.zero_folders_recycler
+                            return
+                        }
                         homeModel.synchronizeTabPosition(position)
+                        updateCurrentTab(homeModel.currentTabType.value)
                     }
                 }
             )
@@ -193,10 +202,6 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
                 findNavController().navigateSafe(HomeFragmentDirections.search())
                 true
             }
-            R.id.action_zero_folders -> {
-                findNavController().navigate(R.id.zero_folder_fragment)
-                true
-            }
             R.id.action_settings -> {
                 L.d("Navigating to preferences")
                 homeModel.showSettings()
@@ -210,6 +215,14 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
 
             // Handle sort menu
             R.id.action_sort -> {
+                if (zeroFoldersSelected) {
+                    val toolbar = requireBinding().homeNormalToolbar
+                    childFragmentManager.fragments
+                        .filterIsInstance<FolderFragment>()
+                        .firstOrNull()
+                        ?.showSortMenu(toolbar.getMenuButton(R.id.action_sort) ?: toolbar)
+                    return true
+                }
                 // Junk click event when opening the menu
                 val directions =
                     when (homeModel.currentTabType.value) {
@@ -252,7 +265,10 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
         TabLayoutMediator(
                 binding.homeTabs,
                 binding.homePager,
-                NamedTabStrategy(homeModel.currentTabTypes),
+                ZeroTabStrategy(
+                    NamedTabStrategy(homeModel.currentTabTypes),
+                    homeModel.currentTabTypes.size,
+                ),
             )
             .attach()
     }
@@ -483,15 +499,17 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
         fragmentManager: FragmentManager,
         lifecycleOwner: LifecycleOwner,
     ) : FragmentStateAdapter(fragmentManager, lifecycleOwner.lifecycle) {
-        override fun getItemCount() = tabs.size
+        override fun getItemCount() = tabs.size + 1
 
         override fun createFragment(position: Int): Fragment =
-            when (tabs[position]) {
-                MusicType.SONGS -> SongListFragment()
-                MusicType.ALBUMS -> AlbumListFragment()
-                MusicType.ARTISTS -> ArtistListFragment()
-                MusicType.GENRES -> GenreListFragment()
-                MusicType.PLAYLISTS -> PlaylistListFragment()
-            }
+            if (position >= tabs.size) FolderFragment.newTab()
+            else
+                when (tabs[position]) {
+                    MusicType.SONGS -> SongListFragment()
+                    MusicType.ALBUMS -> AlbumListFragment()
+                    MusicType.ARTISTS -> ArtistListFragment()
+                    MusicType.GENRES -> GenreListFragment()
+                    MusicType.PLAYLISTS -> PlaylistListFragment()
+                }
     }
 }

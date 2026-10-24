@@ -19,41 +19,146 @@
 package org.oxycblt.auxio.zero
 
 import android.annotation.SuppressLint
+import android.view.LayoutInflater
 import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import androidx.constraintlayout.widget.ConstraintLayout
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import kotlin.math.abs
+import org.oxycblt.auxio.R
+import org.oxycblt.auxio.databinding.FragmentPlaybackBarBinding
+import org.oxycblt.auxio.databinding.ZeroBarGhostBinding
+import org.oxycblt.auxio.music.resolve
+import org.oxycblt.auxio.music.resolveNames
+import org.oxycblt.auxio.playback.state.PlaybackStateManager
+import org.oxycblt.auxio.playback.state.RepeatMode
+import org.oxycblt.musikr.Song
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface ZeroEntryPoint {
+    fun playbackManager(): PlaybackStateManager
+}
 
 /**
- * Lets the user swipe horizontally on this view to skip tracks, Spotify-style. Swiping left goes to
- * the next track, right to the previous one. Taps and long presses keep working.
- *
- * @param moving Views that follow the finger during the swipe.
+ * Spotify-style swiping on the playback bar: the current track slides away while the next (swipe
+ * left) or previous (swipe right) track slides in. Taps and long presses keep working.
  */
 @SuppressLint("ClickableViewAccessibility")
-fun View.installSwipeSkip(moving: List<View>, onNext: () -> Unit, onPrev: () -> Unit) {
+fun FragmentPlaybackBarBinding.installZeroBarSwipe() {
+    val bar = root
+    val context = bar.context
+    val playbackManager =
+        EntryPointAccessors.fromApplication(context, ZeroEntryPoint::class.java).playbackManager()
+    val density = context.resources.displayMetrics.density
     val slop = ViewConfiguration.get(context).scaledTouchSlop
-    val threshold = 64 * resources.displayMetrics.density
+    val minFling = 800 * density
+
+    val ghost = ZeroBarGhostBinding.inflate(LayoutInflater.from(context), bar, false)
+    ghost.root.layoutParams =
+        ConstraintLayout.LayoutParams(0, ConstraintLayout.LayoutParams.WRAP_CONTENT).apply {
+            startToStart = ConstraintLayout.LayoutParams.PARENT_ID
+            endToStart = R.id.playback_controls_wrapper
+            topToTop = R.id.playback_cover
+            bottomToBottom = R.id.playback_cover
+        }
+    // Index 0 so it draws beneath the controls.
+    bar.addView(ghost.root, 0)
+
+    val moving = listOf<View>(playbackCover, playbackSong, playbackInfo)
     var downX = 0f
     var downY = 0f
     var swiping = false
+    var target: Song? = null
+    var targetIndex = -1
+    var direction = 0 // -1 = next (finger moving left), 1 = previous
+    var velocity: VelocityTracker? = null
+    var animating = false
 
-    fun settle(dx: Float) {
-        for (v in moving) {
-            v.animate().translationX(0f).alpha(1f).setDuration(180).start()
+    fun peek(dir: Int): Pair<Int, Song>? {
+        val queue = playbackManager.queue
+        if (queue.isEmpty()) return null
+        var i = playbackManager.index + if (dir < 0) 1 else -1
+        if (i !in queue.indices) {
+            if (playbackManager.repeatMode != RepeatMode.ALL) return null
+            i = if (dir < 0) 0 else queue.lastIndex
         }
-        if (abs(dx) >= threshold) {
-            if (dx < 0) onNext() else onPrev()
-        }
+        return i to queue[i]
     }
 
-    setOnTouchListener { v, e ->
+    fun showGhost(song: Song) {
+        ghost.zeroGhostCover.bind(song)
+        ghost.zeroGhostSong.text = song.name.resolve(context)
+        ghost.zeroGhostInfo.text = song.artists.resolveNames(context)
+        ghost.root.visibility = View.VISIBLE
+    }
+
+    fun layout(dx: Float) {
+        val w = bar.width.toFloat()
+        val dir = if (dx < 0) -1 else 1
+        if (dir != direction) {
+            direction = dir
+            val p = peek(dir)
+            targetIndex = p?.first ?: -1
+            target = p?.second
+            target?.let(::showGhost) ?: run { ghost.root.visibility = View.INVISIBLE }
+        }
+        val t = if (target == null) dx * 0.25f else dx
+        moving.forEach { it.translationX = t }
+        ghost.root.translationX = t - dir * w
+    }
+
+    fun reset() {
+        moving.forEach { it.translationX = 0f }
+        ghost.root.translationX = 0f
+        ghost.root.visibility = View.INVISIBLE
+        direction = 0
+        target = null
+    }
+
+    fun settle(complete: Boolean) {
+        animating = true
+        val w = bar.width.toFloat()
+        val song = target
+        val index = targetIndex
+        val dir = direction
+        val end = if (complete && song != null) dir * w else 0f
+        moving.forEach { it.animate().translationX(end).setDuration(180).start() }
+        ghost.root
+            .animate()
+            .translationX(end - dir * w)
+            .setDuration(180)
+            .withEndAction {
+                if (complete && song != null) {
+                    // Show the new track immediately so nothing flickers back.
+                    playbackCover.bind(song)
+                    playbackSong.text = song.name.resolve(context)
+                    playbackInfo.text = song.artists.resolveNames(context)
+                    playbackManager.goto(index)
+                }
+                reset()
+                animating = false
+            }
+            .start()
+    }
+
+    bar.setOnTouchListener { v, e ->
+        if (animating) return@setOnTouchListener true
+        velocity?.addMovement(e)
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX = e.rawX
                 downY = e.rawY
                 swiping = false
+                direction = 0
+                velocity?.recycle()
+                velocity = VelocityTracker.obtain().also { it.addMovement(e) }
                 false
             }
             MotionEvent.ACTION_MOVE -> {
@@ -62,36 +167,31 @@ fun View.installSwipeSkip(moving: List<View>, onNext: () -> Unit, onPrev: () -> 
                 if (!swiping && abs(dx) > slop && abs(dx) > abs(dy) * 1.5f) {
                     swiping = true
                     (v.parent as? ViewGroup)?.requestDisallowInterceptTouchEvent(true)
-                    // Cancel the pending click/long-press on the view itself.
+                    // Cancel the pending click/long-press on the bar itself.
                     val cancel = MotionEvent.obtain(e).apply { action = MotionEvent.ACTION_CANCEL }
                     v.onTouchEvent(cancel)
                     cancel.recycle()
                 }
-                if (swiping) {
-                    val w = v.width.coerceAtLeast(1)
-                    for (m in moving) {
-                        m.translationX = dx
-                        m.alpha = 1f - (abs(dx) / w).coerceAtMost(0.7f)
-                    }
-                }
+                if (swiping) layout(dx)
                 swiping
             }
-            MotionEvent.ACTION_UP -> {
-                if (swiping) {
-                    swiping = false
-                    (v.parent as? ViewGroup)?.requestDisallowInterceptTouchEvent(false)
-                    settle(e.rawX - downX)
-                    true
-                } else {
-                    false
-                }
-            }
+            MotionEvent.ACTION_UP,
             MotionEvent.ACTION_CANCEL -> {
-                if (swiping) {
-                    swiping = false
-                    settle(0f)
+                val wasSwiping = swiping
+                swiping = false
+                if (wasSwiping) {
+                    (v.parent as? ViewGroup)?.requestDisallowInterceptTouchEvent(false)
+                    val dx = e.rawX - downX
+                    val vt = velocity?.apply { computeCurrentVelocity(1000) }?.xVelocity ?: 0f
+                    val far = abs(dx) > bar.width * 0.35f
+                    val flung = abs(vt) > minFling && (vt < 0) == (dx < 0)
+                    settle(
+                        e.actionMasked == MotionEvent.ACTION_UP && target != null && (far || flung)
+                    )
                 }
-                false
+                velocity?.recycle()
+                velocity = null
+                wasSwiping
             }
             else -> swiping
         }
