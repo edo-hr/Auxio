@@ -188,6 +188,7 @@ constructor(
                 playlistInstructions.put(instructions)
                 playlistList.value = homeGenerator.playlists()
             }
+            MusicType.FOLDERS -> {}
         }
     }
 

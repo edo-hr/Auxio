@@ -5,4 +5,5 @@
     <string name="zero_start">Start</string>
     <string name="zero_stop">Stop</string>
     <string name="zero_file_name">File name</string>
+    <string name="zero_lng_empty_folders">Your folders will show up here.</string>
 </resources>

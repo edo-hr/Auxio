@@ -58,13 +58,13 @@ sealed class Tab(open val type: MusicType) {
         // MusicMode for this tab.
 
         /** The maximum index that a well-formed tab sequence should be. */
-        const val MAX_SEQUENCE_IDX = 4
+        const val MAX_SEQUENCE_IDX = 5
 
         /**
          * The default tab sequence, in integer form. This represents a set of four visible tabs
          * ordered as "Song", "Album", "Artist", "Genre", and "Playlists
          */
-        const val SEQUENCE_DEFAULT = 0b1000_1001_1010_1011_1100
+        const val SEQUENCE_DEFAULT = 0b1000_1001_1010_1011_1100_1101
 
         /** Maps between the integer code in the tab sequence and it's [MusicType]. */
         private val MODE_TABLE =
@@ -74,6 +74,7 @@ sealed class Tab(open val type: MusicType) {
                 MusicType.ARTISTS,
                 MusicType.GENRES,
                 MusicType.PLAYLISTS,
+                MusicType.FOLDERS,
             )
 
         /**
@@ -118,7 +119,12 @@ sealed class Tab(open val type: MusicType) {
 
             // Try to parse a mode for each chunk in the sequence.
             // If we can't parse one, just skip it.
-            for (shift in (0..MAX_SEQUENCE_IDX * 4).reversed() step 4) {
+            // 0 Auxio: sequences saved before the Folders tab existed only have 5 chunks and
+            // never contain the Folders code. Read those as 5 chunks and append Folders.
+            val folderCode = MODE_TABLE.indexOf(MusicType.FOLDERS)
+            val isLegacy = (0..MAX_SEQUENCE_IDX).none { (intCode.shr(it * 4) and 7) == folderCode }
+            val maxShift = if (isLegacy) (MAX_SEQUENCE_IDX - 1) * 4 else MAX_SEQUENCE_IDX * 4
+            for (shift in (0..maxShift).reversed() step 4) {
                 val chunk = intCode.shr(shift) and 0b1111
                 val mode = MODE_TABLE.getOrNull(chunk and 7) ?: continue
 
@@ -130,6 +136,8 @@ sealed class Tab(open val type: MusicType) {
                         Invisible(mode)
                     }
             }
+
+            if (isLegacy) tabs += Visible(MusicType.FOLDERS)
 
             // Make sure there are no duplicate tabs
             val distinct = tabs.distinctBy { it.type }

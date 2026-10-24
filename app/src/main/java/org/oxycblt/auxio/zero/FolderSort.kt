@@ -37,20 +37,33 @@ data class FolderSort(val mode: Mode, val descending: Boolean) {
     }
 
     fun sorted(context: Context, songs: List<Song>): List<Song> {
-        val byFile = Comparator<Song> { a, b -> NaturalOrder.compare(fileName(a), fileName(b)) }
-        val primary: Comparator<Song> =
-            when (mode) {
-                Mode.FILE_NAME -> byFile
-                Mode.TITLE -> compareBy(NaturalOrder) { s: Song -> s.name.resolve(context) }
-                Mode.ARTIST ->
-                    compareBy(NaturalOrder) { s: Song -> s.artists.resolveNames(context) }
-                Mode.ALBUM -> compareBy(NaturalOrder) { s: Song -> s.album.name.resolve(context) }
-                Mode.TRACK ->
-                    compareBy<Song> { it.disc?.number ?: 0 }.thenBy { it.track ?: Int.MAX_VALUE }
-                Mode.DURATION -> compareBy<Song> { it.durationMs }
+        // Resolve every key once up front; resolving inside the comparator is slow.
+        class Keyed(val song: Song, val file: String, val text: String, val num: Long)
+        val keyed =
+            songs.map { s ->
+                val text =
+                    when (mode) {
+                        Mode.TITLE -> s.name.resolve(context)
+                        Mode.ARTIST -> s.artists.resolveNames(context)
+                        Mode.ALBUM -> s.album.name.resolve(context)
+                        else -> ""
+                    }
+                val num =
+                    when (mode) {
+                        Mode.TRACK -> (s.disc?.number ?: 0).toLong() * 100_000 + (s.track ?: 99_999)
+                        Mode.DURATION -> s.durationMs
+                        else -> 0L
+                    }
+                Keyed(s, s.path.name ?: "", text, num)
             }
-        val cmp = primary.then(byFile)
-        return songs.sortedWith(if (descending) cmp.reversed() else cmp)
+        val cmp =
+            Comparator<Keyed> { a, b ->
+                var c = NaturalOrder.compare(a.text, b.text)
+                if (c == 0) c = a.num.compareTo(b.num)
+                if (c == 0) c = NaturalOrder.compare(a.file, b.file)
+                c
+            }
+        return keyed.sortedWith(if (descending) cmp.reversed() else cmp).map { it.song }
     }
 
     fun save(context: Context) {
@@ -67,8 +80,6 @@ data class FolderSort(val mode: Mode, val descending: Boolean) {
 
         private fun prefs(context: Context) =
             context.getSharedPreferences("zero_folders", Context.MODE_PRIVATE)
-
-        private fun fileName(song: Song) = song.path.name ?: ""
 
         fun load(context: Context): FolderSort {
             val p = prefs(context)

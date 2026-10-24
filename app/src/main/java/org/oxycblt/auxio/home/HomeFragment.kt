@@ -65,8 +65,7 @@ import org.oxycblt.auxio.util.collectImmediately
 import org.oxycblt.auxio.util.dampen
 import org.oxycblt.auxio.util.navigateSafe
 import org.oxycblt.auxio.util.showToast
-import org.oxycblt.auxio.zero.FolderFragment
-import org.oxycblt.auxio.zero.ZeroTabStrategy
+import org.oxycblt.auxio.zero.FolderListFragment
 import org.oxycblt.musikr.IndexingProgress
 import org.oxycblt.musikr.Music
 import org.oxycblt.musikr.Playlist
@@ -86,7 +85,6 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
     override val playbackModel: PlaybackViewModel by activityViewModels()
     private val homeModel: HomeViewModel by activityViewModels()
     private val detailModel: DetailViewModel by activityViewModels()
-    private var zeroFoldersSelected = false
     private var storagePermissionLauncher: ActivityResultLauncher<String>? = null
     private var getContentLauncher: ActivityResultLauncher<String>? = null
     private var pendingImportTarget: Playlist? = null
@@ -142,13 +140,7 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
             registerOnPageChangeCallback(
                 object : ViewPager2.OnPageChangeCallback() {
                     override fun onPageSelected(position: Int) {
-                        zeroFoldersSelected = position >= homeModel.currentTabTypes.size
-                        if (zeroFoldersSelected) {
-                            binding.homeAppbar.liftOnScrollTargetViewId = R.id.zero_folders_recycler
-                            return
-                        }
                         homeModel.synchronizeTabPosition(position)
-                        updateCurrentTab(homeModel.currentTabType.value)
                     }
                 }
             )
@@ -215,14 +207,6 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
 
             // Handle sort menu
             R.id.action_sort -> {
-                if (zeroFoldersSelected) {
-                    val toolbar = requireBinding().homeNormalToolbar
-                    childFragmentManager.fragments
-                        .filterIsInstance<FolderFragment>()
-                        .firstOrNull()
-                        ?.showSortMenu(toolbar.getMenuButton(R.id.action_sort) ?: toolbar)
-                    return true
-                }
                 // Junk click event when opening the menu
                 val directions =
                     when (homeModel.currentTabType.value) {
@@ -231,6 +215,14 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
                         MusicType.ARTISTS -> HomeFragmentDirections.sortArtists()
                         MusicType.GENRES -> HomeFragmentDirections.sortGenres()
                         MusicType.PLAYLISTS -> HomeFragmentDirections.sortPlaylists()
+                        MusicType.FOLDERS -> {
+                            val toolbar = requireBinding().homeNormalToolbar
+                            childFragmentManager.fragments
+                                .filterIsInstance<FolderListFragment>()
+                                .firstOrNull()
+                                ?.showSortMenu(toolbar.getMenuButton(R.id.action_sort) ?: toolbar)
+                            return true
+                        }
                     }
                 findNavController().navigateSafe(directions)
                 true
@@ -265,10 +257,7 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
         TabLayoutMediator(
                 binding.homeTabs,
                 binding.homePager,
-                ZeroTabStrategy(
-                    NamedTabStrategy(homeModel.currentTabTypes),
-                    homeModel.currentTabTypes.size,
-                ),
+                NamedTabStrategy(homeModel.currentTabTypes),
             )
             .attach()
     }
@@ -286,6 +275,7 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
                 MusicType.ARTISTS -> R.id.home_artist_recycler
                 MusicType.GENRES -> R.id.home_genre_recycler
                 MusicType.PLAYLISTS -> R.id.home_playlist_recycler
+                MusicType.FOLDERS -> R.id.zero_home_folder_recycler
             }
     }
 
@@ -499,17 +489,16 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
         fragmentManager: FragmentManager,
         lifecycleOwner: LifecycleOwner,
     ) : FragmentStateAdapter(fragmentManager, lifecycleOwner.lifecycle) {
-        override fun getItemCount() = tabs.size + 1
+        override fun getItemCount() = tabs.size
 
         override fun createFragment(position: Int): Fragment =
-            if (position >= tabs.size) FolderFragment.newTab()
-            else
                 when (tabs[position]) {
                     MusicType.SONGS -> SongListFragment()
                     MusicType.ALBUMS -> AlbumListFragment()
                     MusicType.ARTISTS -> ArtistListFragment()
                     MusicType.GENRES -> GenreListFragment()
                     MusicType.PLAYLISTS -> PlaylistListFragment()
+                    MusicType.FOLDERS -> FolderListFragment()
                 }
     }
 }
