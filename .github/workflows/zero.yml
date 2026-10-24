@@ -1,0 +1,100 @@
+name: 0 Auxio
+
+# Rebuilds "0 Auxio" on top of the latest upstream Auxio every day.
+# Nothing is pushed back: the runner rebases this branch onto upstream,
+# builds a debug APK and publishes it as a GitHub release.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [zero]
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: write
+
+env:
+  UPSTREAM_REPO: https://github.com/OxygenCobalt/Auxio.git
+  # Set a repository variable UPSTREAM_REF to e.g. a release tag to follow stable releases instead.
+  UPSTREAM_REF: ${{ vars.UPSTREAM_REF || 'dev' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rebase onto upstream
+        id: rebase
+        run: |
+          git config user.name "zero-bot"
+          git config user.email "zero-bot@users.noreply.github.com"
+          git remote add upstream "$UPSTREAM_REPO"
+          git fetch --no-tags upstream "$UPSTREAM_REF"
+          UP=$(git rev-parse --short FETCH_HEAD)
+          git rebase FETCH_HEAD
+          OURS=$(git rev-parse --short HEAD)
+          echo "tag=zero-$UP-$OURS" >> "$GITHUB_OUTPUT"
+          echo "upstream=$UP" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if already built
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] && gh release view "${{ steps.rebase.outputs.tag }}" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up build tools
+        if: steps.check.outputs.skip != 'true'
+        run: sudo apt-get install -y ninja-build
+
+      - uses: actions/setup-java@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          java-version: "21"
+          distribution: "jetbrains"
+          cache: gradle
+
+      - name: Clone submodules
+        if: steps.check.outputs.skip != 'true'
+        run: git submodule update --init --recursive --remote
+
+      - name: Install signing key
+        if: steps.check.outputs.skip != 'true'
+        env:
+          KEYSTORE: ${{ secrets.DEBUG_KEYSTORE }}
+        run: |
+          if [ -n "$KEYSTORE" ]; then
+            mkdir -p ~/.android
+            echo "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
+          else
+            echo "::warning::DEBUG_KEYSTORE secret missing; APK will be signed with a random key and cannot update a previous install."
+          fi
+
+      - name: Build debug APK
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          chmod +x gradlew
+          ./gradlew app:assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk "0Auxio-${{ steps.rebase.outputs.tag }}-debug.apk"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          name: 0Auxio-debug
+          path: 0Auxio-*.apk
+
+      - name: Publish release
+        if: steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.rebase.outputs.tag }}"
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" 0Auxio-*.apk --target "${{ github.sha }}" \
+            --title "0 Auxio ($TAG)" --notes "Upstream ${{ steps.rebase.outputs.upstream }} ($UPSTREAM_REF)" --latest

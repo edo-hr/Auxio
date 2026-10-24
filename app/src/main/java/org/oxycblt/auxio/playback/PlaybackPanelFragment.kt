@@ -230,6 +230,10 @@ class PlaybackPanelFragment :
     }
 
     override fun onMenuItemClick(item: MenuItem): Boolean {
+        if (item.itemId == R.id.action_zero_sleep_timer) {
+            org.oxycblt.auxio.zero.SleepTimerDialog.show(childFragmentManager)
+            return true
+        }
         if (item.itemId == R.id.action_open_equalizer) {
             // Launch the system equalizer app, if possible.
             L.d("Launching equalizer")

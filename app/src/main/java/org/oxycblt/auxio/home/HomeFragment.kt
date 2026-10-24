@@ -193,6 +193,10 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
                 findNavController().navigateSafe(HomeFragmentDirections.search())
                 true
             }
+            R.id.action_zero_folders -> {
+                findNavController().navigate(R.id.zero_folder_fragment)
+                true
+            }
             R.id.action_settings -> {
                 L.d("Navigating to preferences")
                 homeModel.showSettings()

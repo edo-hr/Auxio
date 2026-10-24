@@ -15,7 +15,7 @@ android {
     namespace "org.oxycblt.auxio"
 
     defaultConfig {
-        applicationId namespace
+        applicationId "org.oxycblt.auxio.zero"
         versionName "4.1.5"
         versionCode 75
 

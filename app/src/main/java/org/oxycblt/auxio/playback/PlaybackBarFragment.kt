@@ -30,6 +30,7 @@ import org.oxycblt.auxio.music.resolveNames
 import org.oxycblt.auxio.playback.state.RepeatMode
 import org.oxycblt.auxio.ui.ViewBindingFragment
 import org.oxycblt.auxio.util.collectImmediately
+import org.oxycblt.auxio.zero.installSwipeSkip
 import org.oxycblt.musikr.Song
 import timber.log.Timber as L
 
@@ -67,6 +68,11 @@ class PlaybackBarFragment : ViewBindingFragment<FragmentPlaybackBarBinding>() {
 
         // Set up actions
         binding.playbackPlayPause.setOnClickListener { playbackModel.togglePlaying() }
+        binding.root.installSwipeSkip(
+            listOf(binding.playbackCover, binding.playbackSong, binding.playbackInfo),
+            playbackModel::next,
+            playbackModel::prev,
+        )
 
         // -- VIEWMODEL SETUP ---
         collectImmediately(playbackModel.song, ::updateSong)
